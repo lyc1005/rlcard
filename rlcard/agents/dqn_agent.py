@@ -1,21 +1,16 @@
 ''' DQN agent
-
 The code is derived from https://github.com/dennybritz/reinforcement-learning/blob/master/DQN/dqn.py
-
 Copyright (c) 2019 Matthew Judell
 Copyright (c) 2019 DATA Lab at Texas A&M University
 Copyright (c) 2016 Denny Britz
-
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
-
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
-
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -31,6 +26,8 @@ import torch
 import torch.nn as nn
 from collections import namedtuple
 from copy import deepcopy
+import math
+import torch.nn.functional as F
 
 from rlcard.utils.utils import remove_illegal
 
@@ -66,7 +63,7 @@ class NoisyFactorizedLinear(nn.Linear):
         return F.linear(input, self.weight + self.sigma_weight * noise_v, bias)
 
     
-class DQNAgent(object):
+class NoisyDQNAgent(object):
     '''
     Approximate clone of rlcard.agents.dqn_agent.DQNAgent
     that depends on PyTorch instead of Tensorflow
@@ -90,7 +87,6 @@ class DQNAgent(object):
         '''
         Q-Learning algorithm for off-policy TD control using Function Approximation.
         Finds the optimal greedy policy while following an epsilon-greedy policy.
-
         Args:
             replay_memory_size (int): Size of the replay memory
             replay_memory_init_size (int): Number of random experiences to sample when initializing
@@ -148,7 +144,6 @@ class DQNAgent(object):
         ''' Store data in to replay buffer and train the agent. There are two stages.
             In stage 1, populate the memory without training
             In stage 2, train the agent every several timesteps
-
         Args:
             ts (list): a list of 5 elements that represent the transition
         '''
@@ -162,10 +157,8 @@ class DQNAgent(object):
     def step(self, state):
         ''' Predict the action for genrating training data but
             have the predictions disconnected from the computation graph
-
         Args:
             state (numpy.array): current state
-
         Returns:
             action (int): an action id
         '''
@@ -181,10 +174,8 @@ class DQNAgent(object):
 
     def eval_step(self, state):
         ''' Predict the action for evaluation purpose.
-
         Args:
             state (numpy.array): current state
-
         Returns:
             action (int): an action id
             info (dict): A dictionary containing information
@@ -199,10 +190,8 @@ class DQNAgent(object):
 
     def predict(self, state):
         ''' Predict the masked Q-values
-
         Args:
             state (numpy.array): current state
-
         Returns:
             q_values (numpy.array): a 1-d array where each entry represents a Q value
         '''
@@ -216,7 +205,6 @@ class DQNAgent(object):
 
     def train(self):
         ''' Train the network
-
         Returns:
             loss (float): The loss of the current batch.
         '''
@@ -252,7 +240,6 @@ class DQNAgent(object):
 
     def feed_memory(self, state, action, reward, next_state, legal_actions, done):
         ''' Feed transition to memory
-
         Args:
             state (numpy.array): the current state
             action (int): the performed action ID
@@ -272,14 +259,12 @@ class Estimator(object):
     '''
     Approximate clone of rlcard.agents.dqn_agent.Estimator that
     uses PyTorch instead of Tensorflow.  All methods input/output np.ndarray.
-
     Q-Value Estimator neural network.
     This network is used for both the Q-Network and the Target Network.
     '''
 
     def __init__(self, num_actions=2, learning_rate=0.001, state_shape=None, mlp_layers=None, device=None):
         ''' Initilalize an Estimator object.
-
         Args:
             num_actions (int): the number output actions
             state_shape (list): the shape of the state space
@@ -313,10 +298,8 @@ class Estimator(object):
         ''' Predicts action values, but prediction is not included
             in the computation graph.  It is used to predict optimal next
             actions in the Double-DQN algorithm.
-
         Args:
           s (np.ndarray): (batch, state_len)
-
         Returns:
           np.ndarray of shape (batch_size, NUM_VALID_ACTIONS) containing the estimated
           action values.
@@ -331,12 +314,10 @@ class Estimator(object):
             In this case y is the target-network estimated
             value of the Q-network optimal actions, which
             is labeled y in Algorithm 1 of Minh et al. (2015)
-
         Args:
           s (np.ndarray): (batch, state_shape) state representation
           a (np.ndarray): (batch,) integer sampled actions
           y (np.ndarray): (batch,) value of optimal actions according to Q-target
-
         Returns:
           The calculated loss on the batch.
         '''
@@ -372,7 +353,6 @@ class EstimatorNetwork(nn.Module):
 
     def __init__(self, num_actions=2, state_shape=None, mlp_layers=None):
         ''' Initialize the Q network
-
         Args:
             num_actions (int): number of legal actions
             state_shape (list): shape of state tensor
@@ -396,7 +376,6 @@ class EstimatorNetwork(nn.Module):
 
     def forward(self, s):
         ''' Predict action values
-
         Args:
             s  (Tensor): (batch, state_shape)
         '''
@@ -417,7 +396,6 @@ class Memory(object):
 
     def save(self, state, action, reward, next_state, legal_actions, done):
         ''' Save transition into memory
-
         Args:
             state (numpy.array): the current state
             action (int): the performed action ID
@@ -433,7 +411,6 @@ class Memory(object):
 
     def sample(self):
         ''' Sample a minibatch from the replay memory
-
         Returns:
             state_batch (list): a batch of states
             action_batch (list): a batch of actions
